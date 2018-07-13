@@ -24,7 +24,7 @@
 
 import $ from "jquery";
 import _ from "underscore";
-import EventEmitter from "eventEmitter";
+import EventEmitter from "eventemitter3";
 
 var _registeredPlugins = {};
 
