@@ -720,42 +720,9 @@ var ReflowableView = function(options, reader) {
         adjustedGapRight = Math.max(0, adjustedGapRight - borderRight);
         // Typically, "adjustedGapRight" is zero because the space available for the 'next page' button is wider than half of the column gap! (in other words, the right-most and left-most page margins are fully included in the strips reserved for the arrow buttons)
 
-        // Note that "availableWidth" does not contain "borderLeft" and "borderRight" (.width() excludes the padding and border and margin in the CSS box model of div#epub-reader-frame)  
-        var availableWidth = _$viewport.width();
-
-        // ...So, we substract the page margins and button spacing to obtain the width available for actual text:
-        var textWidth = availableWidth - adjustedGapLeft - adjustedGapRight;
-
-        // ...and if we have 2 pages / columns, then we split the text width in half: 
-        if (isDoublePageSyntheticSpread) {
-            textWidth = (textWidth - _paginationInfo.columnGap) * 0.5;
-        }
-
-        var filler = 0;
-
-        // Now, if the resulting width actually available for document content is greater than the maximum allowed value, we create even more left+right blank space to "compress" the horizontal run of text.  
-        if (textWidth > MAXW) {
-            var eachPageColumnReduction = textWidth - MAXW;
-
-            // if we have a 2-page synthetic spread, then we "trim" left and right sides by adding "eachPageColumnReduction" blank space.
-            // if we have a single page / column, then this loss of text real estate is shared between right and left sides  
-            filler = Math.floor(eachPageColumnReduction * (isDoublePageSyntheticSpread ? 1 : 0.5));
-        }
-
-        // Let's check whether a narrow two-page synthetic spread (impeded reabability) can be reduced down to a single page / column:
-        else if (!forced && textWidth < MINW && isDoublePageSyntheticSpread) {
-            isDoublePageSyntheticSpread = false;
-            _paginationInfo.visibleColumnCount = 1;
-
-            textWidth = availableWidth - adjustedGapLeft - adjustedGapRight;
-            if (textWidth > MAXW) {
-                filler = Math.floor((textWidth - MAXW) * 0.5);
-            }
-        }
-
         _$el.css({
-            "left": (filler + adjustedGapLeft + "px"),
-            "right": (filler + adjustedGapRight + "px")
+            "left": (adjustedGapLeft + "px"),
+            "right": (adjustedGapRight + "px")
         });
 
         updateViewportSize(); //_$contentFrame ==> _lastViewPortSize
