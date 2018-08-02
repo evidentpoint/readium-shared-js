@@ -30,6 +30,7 @@ import CfiNavigationLogic from "./cfi_navigation_logic";
 import Helpers from "../helpers";
 import ViewerSettings from "../models/viewer_settings";
 import BookmarkData from "../models/bookmark_data";
+import CurrentPagesInfo from "../models/current_pages_info";
 import { ResizeSensor } from "css-element-queries";
 
 /**
@@ -1005,6 +1006,17 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
             width: _meta_size.width,
             height: _meta_size.height
         };
+    }
+
+    this.getPaginationInfo = function() {
+        var paginationInfo = new CurrentPagesInfo(_spine, true);
+        paginationInfo.addOpenPage(0, 1, _currentSpineItem.idref, _currentSpineItem.index);
+
+        return paginationInfo;
+    };
+
+    this.getLoadedSpineItems = function() {
+        return [_currentSpineItem];
     }
 
     this.getNavigator = function() {
