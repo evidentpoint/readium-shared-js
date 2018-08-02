@@ -1386,6 +1386,9 @@ var CfiNavigationLogic = function(options) {
     }
 
     this.getLeafNodeElements = function($root) {
+        if (!$root || !$root.length) {
+            return null;
+        }
 
         if (_cacheEnabled) {
             var fromCache = _cache.leafNodeElements.get($root);
