@@ -1178,6 +1178,10 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
     this.getPageIndexOffsetFromCfi = function(cfi) {
         return self.getNavigator().getPageIndexDeltaForCfi(cfi);
     };
+
+    this.get$Iframe = function() {
+        return _$iframe;
+    };
 };
 
 OnePageView.Events = {
