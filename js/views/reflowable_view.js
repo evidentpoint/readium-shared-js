@@ -901,6 +901,10 @@ var ReflowableView = function(options, reader) {
         _currentOpacity = -1;
     }
 
+    this.element = function() {
+        return _$el;
+    };
+
     this.getPaginationInfo = function() {
 
         var paginationInfo = new CurrentPagesInfo(_spine, false);
