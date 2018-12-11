@@ -1083,4 +1083,16 @@ Helpers.polyfillCaretRangeFromPoint = function(document) {
     }
 };
 
+Helpers.createStyleSheet = function(document, id) {
+    var style = document.createElement("style");
+    style.id = 'rd-stylesheet-' + id;
+    style.appendChild(document.createTextNode(""));
+    document.head.appendChild(style);
+    return style.sheet;
+};
+
+Helpers.removeStyleSheet = function(document, id) {
+    return !!$('style#rd-stylesheet-' + id, document).remove().length;
+};
+
 export default Helpers;
