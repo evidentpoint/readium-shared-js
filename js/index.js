@@ -9,4 +9,5 @@ export {default as ViewerSettings} from './models/viewer_settings';
 export {default as StyleCollection} from './models/style_collection';
 export {default as Helpers} from './helpers';
 export {default as Plugins} from './plugins_controller';
+export {default as InternalLinksSupport} from './views/internal_links_support';
 export {epubReadingSystemObject} from './epubReadingSystemObject';
