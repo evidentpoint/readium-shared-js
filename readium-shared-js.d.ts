@@ -9,6 +9,7 @@ export var ViewerSettings: any;
 export var StyleCollection: any;
 export var Helpers: any;
 export var Plugins: any;
+export var InternalLinksSupport: any;
 export default ReaderView;
 
 export class PaginationChangedEventArgs {
