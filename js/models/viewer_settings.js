@@ -188,6 +188,14 @@ var ViewerSettings = function(settingsData) {
     this.scroll = "auto";
 
     /**
+     *
+     * @property enableInternalLinks
+     * @type bool
+     */
+
+    this.enableInternalLinks = true;
+
+    /**
      * Builds an array
      *
      * @method     buildArray
@@ -257,6 +265,7 @@ var ViewerSettings = function(settingsData) {
         mapProperty("syntheticSpread", settingsData);
         mapProperty("pageTransition", settingsData);
         mapProperty("enableGPUHardwareAccelerationCSS3D", settingsData);
+        mapProperty("enableInternalLinks", settingsData);
     };
 
     this.update(settingsData);

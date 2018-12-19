@@ -177,7 +177,7 @@ var InternalLinksSupport = function(reader) {
 
     }
 
-    this.processLinkElements = function($iframe, spineItem) {
+    this.processLinkElements = function($iframe, spineItem, enableInternalLinks) {
 
         var epubContentDocument = $iframe[0].contentDocument;
 

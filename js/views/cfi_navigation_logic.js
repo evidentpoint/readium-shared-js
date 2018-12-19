@@ -40,11 +40,8 @@ import * as EPUBcfi from 'readium-cfi-js';
 var CfiNavigationLogic = function(options) {
     var self = this;
     options = options || {};
+
     var _DEBUG = false;
-    // var _DEBUG = ReadiumSDK.DEBUG_MODE;
-    // if (_DEBUG) {
-    //     window.top._DEBUG_visibleTextRangeOffsetsRuns = window.top._DEBUG_visibleTextRangeOffsetsRuns || [];
-    // }
 
     this.getRootElement = function() {
         if (!options.$iframe) {
@@ -119,7 +116,7 @@ var CfiNavigationLogic = function(options) {
         // https://bugs.webkit.org/show_bug.cgi?id=138949
         // Thankfully it implements getClientRects() properly...
         // A collapsed text range may still have geometry!
-        if (range.collapsed) {
+        if (range.collapsed && range.getClientRects().length > 0) {
             return normalizeRectangle(range.getClientRects()[0], 0, 0);
         } else {
             return normalizeRectangle(range.getBoundingClientRect(), 0, 0);
@@ -517,13 +514,15 @@ var CfiNavigationLogic = function(options) {
      */
     function normalizeRectangle(textRect, leftOffset, topOffset) {
 
+            // Round non-integer values that are sub-pixels because
+            // they might differ in Chrome on Windows vs other OSes or browsers
         var plainRectObject = {
-            left: textRect.left,
-            right: textRect.right,
-            top: textRect.top,
-            bottom: textRect.bottom,
-            width: textRect.right - textRect.left,
-            height: textRect.bottom - textRect.top
+            left: Math.round(textRect.left),
+            right: Math.round(textRect.right),
+            top: Math.round(textRect.top),
+            bottom: Math.round(textRect.bottom),
+            width: Math.round(textRect.right - textRect.left),
+            height: Math.round(textRect.bottom - textRect.top),
         };
         leftOffset = leftOffset || 0;
         topOffset = topOffset || 0;
@@ -843,7 +842,7 @@ var CfiNavigationLogic = function(options) {
         var textNode = visibleLeafNode.textNode;
 
         //if a valid text node is found, try to generate a CFI with range offsets
-        if (textNode && isValidTextNode(textNode)) {
+        if (textNode && self.isValidTextNode(textNode)) {
             var visibleRange = getVisibleTextRangeOffsets(textNode, pickerFunc, visibleContentOffsets, frameDimensions);
             if (!visibleRange) {
                 if (_DEBUG) console.warn("findVisibleLeafNodeCfi: failed to find text range offset");
@@ -1028,11 +1027,11 @@ var CfiNavigationLogic = function(options) {
             };
             var nodeRangeClientRect =
                 startRangeInfo && endRangeInfo ?
-                getNodeRangeClientRect(
-                    startRangeInfo.node,
-                    startRangeInfo.offset,
-                    endRangeInfo.node,
-                    endRangeInfo.offset) : null;
+                    getNodeRangeClientRect(
+                        startRangeInfo.node,
+                        startRangeInfo.offset,
+                        endRangeInfo.node,
+                        endRangeInfo.offset) : null;
 
             if (_DEBUG) {
                 console.log(nodeRangeClientRect);
@@ -1115,7 +1114,7 @@ var CfiNavigationLogic = function(options) {
         var isTextNode;
 
         var siblingTextNodesAndSelf = _.filter(element.parentNode.childNodes, function(n) {
-            return n === element || isValidTextNode(n);
+            return n === element || self.isValidTextNode(n);
         });
 
         var indexOfSelf = siblingTextNodesAndSelf.indexOf(element);
@@ -1133,7 +1132,7 @@ var CfiNavigationLogic = function(options) {
         }
 
         // Prioritize text node use
-        if (isValidTextNode(nearestNode)) {
+        if (self.isValidTextNode(nearestNode)) {
             chosenNode = nearestNode;
             isTextNode = true;
         } else if (isElementNode(nearestNode)) {
@@ -1397,6 +1396,10 @@ var CfiNavigationLogic = function(options) {
             }
         }
 
+        if (!$root || !$root[0]) {
+            return [];
+        }
+
         //noinspection JSUnresolvedVariable,JSCheckFunctionSignatures
         var nodeIterator = document.createNodeIterator(
             $root[0],
@@ -1413,7 +1416,7 @@ var CfiNavigationLogic = function(options) {
         var node;
         while ((node = nodeIterator.nextNode())) {
             var isLeafNode = node.nodeType === Node.ELEMENT_NODE && !node.childElementCount && !isValidTextNodeContent(node.textContent);
-            if (isLeafNode || isValidTextNode(node)) {
+            if (isLeafNode || self.isValidTextNode(node)) {
                 var element = (node.nodeType === Node.TEXT_NODE) ? node.parentNode : node;
                 if (!isElementBlacklisted(element)) {
                     $leafNodeElements.push($(node));
@@ -1435,7 +1438,7 @@ var CfiNavigationLogic = function(options) {
         }
     }
 
-    function isValidTextNode(node) {
+    this.isValidTextNode = function(node) {
         if (!node) {
             return false;
         }
@@ -1446,7 +1449,7 @@ var CfiNavigationLogic = function(options) {
 
         return false;
 
-    }
+    };
 
     function isValidTextNodeContent(text) {
         // Heuristic to find a text node with actual text
@@ -1633,7 +1636,7 @@ var CfiNavigationLogic = function(options) {
                 if (node.nodeType === Node.ELEMENT_NODE && isElementBlacklisted(node))
                     return NodeFilter.FILTER_REJECT;
 
-                if (node.nodeType === Node.TEXT_NODE && !isValidTextNode(node))
+                if (node.nodeType === Node.TEXT_NODE && !self.isValidTextNode(node))
                     return NodeFilter.FILTER_REJECT;
 
                 var visibilityResult = checkVisibilityByRectangles($(node), true, visibleContentOffsets, frameDimensions);
@@ -1669,7 +1672,7 @@ var CfiNavigationLogic = function(options) {
             if (!hasChildElements && hasChildTextNodes) {
                 for (var i = node.childNodes.length - 1; i >= 0; i--) {
                     var childNode = node.childNodes[i];
-                    if (childNode.nodeType === Node.TEXT_NODE && isValidTextNode(childNode)) {
+                    if (childNode.nodeType === Node.TEXT_NODE && self.isValidTextNode(childNode)) {
                         var visibilityResult = checkVisibilityByRectangles($(childNode), true, visibleContentOffsets, frameDimensions);
                         if (visibilityResult) {
                             firstVisibleElement = node;
@@ -1716,7 +1719,7 @@ var CfiNavigationLogic = function(options) {
                 if (node.nodeType === Node.ELEMENT_NODE && isElementBlacklisted(node))
                     return NodeFilter.FILTER_REJECT;
 
-                if (node.nodeType === Node.TEXT_NODE && !isValidTextNode(node))
+                if (node.nodeType === Node.TEXT_NODE && !self.isValidTextNode(node))
                     return NodeFilter.FILTER_REJECT;
 
                 var visibilityResult = checkVisibilityByRectangles($(node), true, visibleContentOffsets, frameDimensions);
@@ -1754,7 +1757,7 @@ var CfiNavigationLogic = function(options) {
             if (!hasChildElements && hasChildTextNodes) {
                 for (var i = node.childNodes.length - 1; i >= 0; i--) {
                     var childNode = node.childNodes[i];
-                    if (childNode.nodeType === Node.TEXT_NODE && isValidTextNode(childNode)) {
+                    if (childNode.nodeType === Node.TEXT_NODE && self.isValidTextNode(childNode)) {
                         var visibilityResult = checkVisibilityByRectangles($(childNode), true, visibleContentOffsets, frameDimensions);
                         if (visibilityResult) {
                             firstVisibleElement = node;

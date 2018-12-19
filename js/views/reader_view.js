@@ -255,7 +255,7 @@ var ReaderView = function(options) {
             // performance degrades with large DOM (e.g. word-level text-audio sync)
             _mediaOverlayDataInjector.attachMediaOverlayData($iframe, spineItem, _viewerSettings);
 
-            _internalLinksSupport.processLinkElements($iframe, spineItem);
+            _internalLinksSupport.processLinkElements($iframe, spineItem, _viewerSettings.enableInternalLinks);
 
             _externalAgentSupport.bindToContentDocument(contentDoc, spineItem);
 
@@ -310,10 +310,8 @@ var ReaderView = function(options) {
 
         // we do this to wait until elements are rendered otherwise book is not able to determine view size.
         setTimeout(function() {
-
             callback(true);
-
-        }, 50);
+        }, 25);
 
     }
 
@@ -501,28 +499,30 @@ var ReaderView = function(options) {
     }
 
     /**
-     * Flips the page from left to right.
-     * Takes to account the page progression direction to decide to flip to prev or next page.
+     * Flips the page from left to right. Takes to account the page progression direction to decide to flip to prev or next page.
+     *
+     * @returns {boolean} True if page successfully opened, false if page failed to open, undefined if the result is undetermined (as this depends on child view implementations)
      */
     this.openPageLeft = function() {
 
         if (_package.spine.isLeftToRight()) {
-            self.openPagePrev();
+            return self.openPagePrev();
         } else {
-            self.openPageNext();
+            return self.openPageNext();
         }
     };
 
     /**
-     * Flips the page from right to left.
-     * Takes to account the page progression direction to decide to flip to prev or next page.
+     * Flips the page from right to left. Takes to account the page progression direction to decide to flip to prev or next page.
+     *
+     * @returns {boolean} True if page successfully opened, false if page failed to open, undefined if the result is undetermined (as this depends on child view implementations)
      */
     this.openPageRight = function() {
 
         if (_package.spine.isLeftToRight()) {
-            self.openPageNext();
+            return self.openPageNext();
         } else {
-            self.openPagePrev();
+            return self.openPagePrev();
         }
 
     };
@@ -643,25 +643,25 @@ var ReaderView = function(options) {
 
     /**
      * Opens the next page.
+     *
+     * @returns {boolean} True if page successfully opened, false if page failed to open, undefined if the result is undetermined (as this depends on child view implementations)
      */
     this.openPageNext = function() {
 
         if (self.getCurrentViewType() === ReaderView.VIEW_TYPE_SCROLLED_CONTINUOUS) {
-            _currentView.openPageNext(self);
-            return;
+            return _currentView.openPageNext(self);
         }
 
         var paginationInfo = _currentView.getPaginationInfo();
 
         if (paginationInfo.openPages.length == 0) {
-            return;
+            return false;
         }
 
         var lastOpenPage = paginationInfo.openPages[paginationInfo.openPages.length - 1];
 
         if (lastOpenPage.spineItemPageIndex < lastOpenPage.spineItemPageCount - 1) {
-            _currentView.openPageNext(self);
-            return;
+            return _currentView.openPageNext(self);
         }
 
         var currentSpineItem = _spine.getItemById(lastOpenPage.idref);
@@ -669,36 +669,36 @@ var ReaderView = function(options) {
         var nextSpineItem = _spine.nextItem(currentSpineItem);
 
         if (!nextSpineItem) {
-            return;
+            return false;
         }
 
         var openPageRequest = new PageOpenRequest(nextSpineItem, self);
         openPageRequest.setFirstPage();
 
-        openPage(openPageRequest, 2);
+        return openPage(openPageRequest, 2);
     };
 
     /**
      * Opens the previous page.
+     *
+     * @returns {boolean} True if page successfully opened, false if page failed to open, undefined if the result is undetermined (as this depends on child view implementations)
      */
     this.openPagePrev = function() {
 
         if (self.getCurrentViewType() === ReaderView.VIEW_TYPE_SCROLLED_CONTINUOUS) {
-            _currentView.openPagePrev(self);
-            return;
+            return _currentView.openPagePrev(self);
         }
 
         var paginationInfo = _currentView.getPaginationInfo();
 
         if (paginationInfo.openPages.length == 0) {
-            return;
+            return false;
         }
 
         var firstOpenPage = paginationInfo.openPages[0];
 
         if (firstOpenPage.spineItemPageIndex > 0) {
-            _currentView.openPagePrev(self);
-            return;
+            return _currentView.openPagePrev(self);
         }
 
         var currentSpineItem = _spine.getItemById(firstOpenPage.idref);
@@ -706,13 +706,13 @@ var ReaderView = function(options) {
         var prevSpineItem = _spine.prevItem(currentSpineItem);
 
         if (!prevSpineItem) {
-            return;
+            return false;
         }
 
         var openPageRequest = new PageOpenRequest(prevSpineItem, self);
         openPageRequest.setLastPage();
 
-        openPage(openPageRequest, 1);
+        return openPage(openPageRequest, 1);
     };
 
     function getSpineItem(idref) {
@@ -1569,22 +1569,24 @@ var ReaderView = function(options) {
     };
     /**
      * Get CFI of the first element visible in the viewport
+     * @param {string} [idref] Optional spine item idref to limit the scope with
      * @returns {ReadiumSDK.Models.BookmarkData}
      */
-    this.getFirstVisibleCfi = function() {
+    this.getFirstVisibleCfi = function(spineItemIdref) {
         if (_currentView) {
-            return _currentView.getFirstVisibleCfi();
+            return _currentView.getFirstVisibleCfi(spineItemIdref);
         }
         return undefined;
     };
 
     /**
      * Get CFI of the last element visible in the viewport
+     * @param {string} [idref] Optional spine item idref to limit the scope with
      * @returns {ReadiumSDK.Models.BookmarkData}
      */
-    this.getLastVisibleCfi = function() {
+    this.getLastVisibleCfi = function(spineItemIdref) {
         if (_currentView) {
-            return _currentView.getLastVisibleCfi();
+            return _currentView.getLastVisibleCfi(spineItemIdref);
         }
         return undefined;
     };
@@ -1727,6 +1729,25 @@ var ReaderView = function(options) {
             return _currentView.getNearestCfiFromElement(element);
         }
         return undefined;
+    };
+
+
+    /**
+     * Loaded content frame information
+     *
+     * @typedef {object} LoadedContentFrameInfo
+     * @property {jQueryElement} $iframe        The content document's iframe element, jquery wrapped.
+     * @proptery {SpineItem}  The spine item associated with the content frame.
+     */
+
+    /**
+     * Get a list of the currently loaded content iframe references, mapped with the respective spine item idrefs.
+     * @returns {LoadedContentFrameInfo[]}
+     */
+    this.getLoadedContentFrames = function () {
+        if (_currentView && _currentView.getLoadedContentFrames) {
+            return _currentView.getLoadedContentFrames();
+        }
     };
 
 };

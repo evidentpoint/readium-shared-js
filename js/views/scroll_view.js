@@ -640,6 +640,8 @@ var ScrollView = function(options, isContinuousScroll, reader) {
 
     function onPageViewLoaded(pageView, success, $iframe, spineItem, isNewlyLoaded, context) {
 
+        fitImages(pageView);
+
         if (success && isNewlyLoaded) {
             Globals.logEvent("CONTENT_DOCUMENT_LOADED", "EMIT", "scroll_view.js [ " + spineItem.href + " ]");
             self.emit(Globals.Events.CONTENT_DOCUMENT_LOADED, $iframe, spineItem);
@@ -855,6 +857,11 @@ var ScrollView = function(options, isContinuousScroll, reader) {
     }
 
     function onPaginationChanged(initiator, paginationRequest_spineItem, paginationRequest_elementId) {
+
+        var visibleViews = getVisiblePageViews();
+        _.each(visibleViews, function (view) {
+            fitImages(view);
+        });
 
         Globals.logEvent("InternalEvents.CURRENT_VIEW_PAGINATION_CHANGED", "EMIT", "scroll_view.js");
         self.emit(Globals.InternalEvents.CURRENT_VIEW_PAGINATION_CHANGED, {
@@ -1240,6 +1247,10 @@ var ScrollView = function(options, isContinuousScroll, reader) {
         elementRange.bottom = elementRange.top + boundingClientRect.height;
 
         return elementRange;
+    }
+
+    function fitImages(pageView) {
+        pageView._fitImages({doNotChangeHeight: true});
     }
 
     this.insureElementVisibility = function(spineItemId, element, initiator) {

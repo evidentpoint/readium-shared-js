@@ -564,7 +564,7 @@ Helpers.triggerLayout = function($iframe) {
 
     var ss = undefined;
     try {
-        ss = doc.styleSheets && doc.styleSheets.length ? doc.styleSheets[0] : undefined;
+        ss = doc.styleSheets && doc.styleSheets.length ? doc.styleSheets[doc.styleSheets.length-1] : undefined;
         if (!ss) {
             var style = doc.createElement('style');
             doc.head.appendChild(style);
@@ -969,6 +969,55 @@ Helpers.extendedThrottle = function(startCb, tickCb, endCb, tickRate, waitThresh
     };
 };
 
+Helpers.fitImages = function ($html, options) {
+    if (!$html) {
+        return;
+    }
+
+    options = options || {};
+
+    var $elem;
+    var height;
+    var width;
+    var $body = $('body', $html);
+    //maxHeight is (html el height) - (body el padding+margin+border)
+    //we add 3 to the maxHeight as a buffer, this fixes a strange scaling issue on IE11
+    // if we set max-width/max-height to 100% columnizing engine chops images embedded in the text
+    // (but not if we set it to 99-98%) go figure.
+    var maxDimensions = {
+        maxHeight: $html.height() - ($body.outerHeight(true) - $body.height()
+        + Math.floor($html.height() * 0.02)),
+        maxWidth: ($body[0].getClientRects()[0] ? $body[0].getClientRects()[0].width : $html.width())
+        - Math.floor($html.width() * 0.02)
+    };
+
+    $('img, svg', $html).each(function(){
+
+        $elem = $(this);
+
+        if (options.doNotChangeWidth) {
+            delete maxDimensions.maxWidth;
+        }
+        if (options.doNotChangeHeight) {
+            delete maxDimensions.maxHeight;
+        }
+
+        $elem.css(maxDimensions);
+
+        var ratiosUnbalanced = false;
+        if ($elem[0].tagName.toLowerCase() === "img") {
+            ratiosUnbalanced =
+                (($elem[0].naturalWidth / $elem[0].naturalHeight) * 10 | 0) !==
+                (($elem[0].clientWidth / $elem[0].clientHeight) * 10 | 0);
+        }
+        if (!$elem.css('height') || ratiosUnbalanced) {
+            $elem.css('height', 'auto');
+        }
+        if (!$elem.css('width') || ratiosUnbalanced) {
+            $elem.css('width', 'auto');
+        }
+    });
+};
 
 //TODO: consider using CSSOM escape() or polyfill
 //https://github.com/mathiasbynens/CSS.escape/blob/master/css.escape.js
@@ -1081,6 +1130,39 @@ Helpers.polyfillCaretRangeFromPoint = function(document) {
             }
         }
     }
+};
+
+Helpers.detectScrollOffsetTechniqueSupport = function(document) {
+    var iframe = document.createElement('iframe');
+    document.documentElement.appendChild(iframe);
+    var iframeDoc = iframe.contentDocument;
+    $(iframeDoc.documentElement).css({
+        "opacity": "1",
+        "position": "relative",
+        "-webkit-column-axis": "horizontal",
+        "font-size": "24px",
+        "column-gap": "0px",
+        "height": "100px",
+        "min-height": "100px",
+        "max-height": "100px",
+        "margin": "0px",
+        "padding": "0px",
+        "border": "0px",
+        "width": "50px",
+        "column-count": "auto",
+        "column-width": "50px",
+        "column-fill": "auto",
+        "left": "0px",
+        "right": "0px",
+        "top": "0px",
+    });
+    $('body', iframeDoc.documentElement).text("Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod " +
+        "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.");
+    var scrollingEl = iframeDoc.scrollingElement || iframeDoc.body;
+    scrollingEl.scrollLeft = 50;
+    var test = scrollingEl.scrollLeft === 50;
+    $(iframe).remove();
+    return test;
 };
 
 Helpers.createStyleSheet = function(document, id) {

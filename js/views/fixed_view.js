@@ -68,8 +68,10 @@ var FixedView = function(options, reader) {
     var _spread = new Spread(_spine, false);
     var _bookMargins;
     var _contentMetaSize;
-    var _isRedrowing = false;
+    var _isRedrawing = false;
     var _redrawRequest = false;
+
+    var scrollbarSize = 30;
 
     function createOnePageView(elementClass) {
 
@@ -164,15 +166,12 @@ var FixedView = function(options, reader) {
 
     function redraw(initiator, paginationRequest) {
 
-        if (_isRedrowing) {
-            _redrawRequest = {
-                initiator: initiator,
-                paginationRequest: paginationRequest
-            };
-            return;
+        if (_isRedrawing) {
+            _redrawRequest = { initiator: initiator, paginationRequest: paginationRequest };
+            return false;
         }
 
-        _isRedrowing = true;
+        _isRedrawing = true;
 
         var context = {
             isElementAdded: false
@@ -193,7 +192,7 @@ var FixedView = function(options, reader) {
         }]);
 
         $.when.apply($, pageLoadDeferrals).done(function() {
-            _isRedrowing = false;
+            _isRedrawing = false;
 
             if (_redrawRequest) {
                 var p1 = _redrawRequest.initiator;
@@ -219,6 +218,7 @@ var FixedView = function(options, reader) {
 
         });
 
+        return true;
     }
 
     // dir: 0 => new or same page, 1 => previous, 2 => next
@@ -354,8 +354,8 @@ var FixedView = function(options, reader) {
         };
 
         var potentialContentSize = {
-            width: potentialTargetElementSize.width - pageMargins.width(),
-            height: potentialTargetElementSize.height - pageMargins.height()
+            width: potentialTargetElementSize.width - pageMargins.width() - scrollbarSize,
+            height: potentialTargetElementSize.height - pageMargins.height(),
         };
 
         if (potentialTargetElementSize.width <= 0 || potentialTargetElementSize.height <= 0) {
@@ -508,7 +508,7 @@ var FixedView = function(options, reader) {
     this.openPage = function(paginationRequest, dir) {
 
         if (!paginationRequest.spineItem) {
-            return;
+            return false;
         }
 
         var leftItem = _spread.leftItem;
@@ -525,7 +525,11 @@ var FixedView = function(options, reader) {
 
         updatePageSwitchDir(dir === 0 ? 0 : (_spread.spine.isRightToLeft() ? (dir === 1 ? 2 : 1) : dir), hasChanged);
 
-        redraw(paginationRequest.initiator, paginationRequest);
+        if (hasChanged) {
+            return redraw(paginationRequest.initiator, paginationRequest); // this will call onPaginationChanged
+        }
+
+        return true;
     };
 
 
@@ -535,7 +539,7 @@ var FixedView = function(options, reader) {
 
         updatePageSwitchDir(_spread.spine.isRightToLeft() ? 2 : 1, true);
 
-        redraw(initiator, undefined);
+        return redraw(initiator, undefined);
     };
 
     this.openPageNext = function(initiator) {
@@ -544,7 +548,7 @@ var FixedView = function(options, reader) {
 
         updatePageSwitchDir(_spread.spine.isRightToLeft() ? 1 : 2, true);
 
-        redraw(initiator, undefined);
+        return redraw(initiator, undefined);
     };
 
     function updatePageViewForItem(pageView, item, context) {
@@ -771,7 +775,13 @@ var FixedView = function(options, reader) {
     };
 
 
-    this.getFirstVisibleCfi = function() {
+    this.getFirstVisibleCfi = function(spineItemIdref) {
+        if (spineItemIdref) {
+            return callOnPageView(spineItemIdref, function(view) {
+                return view.getFirstVisibleCfi();
+            });
+        }
+
         var views = getDisplayingViews();
         if (views.length > 0) {
             return views[0].getFirstVisibleCfi();
@@ -779,7 +789,13 @@ var FixedView = function(options, reader) {
         return undefined;
     };
 
-    this.getLastVisibleCfi = function() {
+    this.getLastVisibleCfi = function(spineItemIdref) {
+        if (spineItemIdref) {
+            return callOnPageView(spineItemIdref, function(view) {
+                return view.getLastVisibleCfi();
+            });
+        }
+
         var views = getDisplayingViews();
         if (views.length > 0) {
             return views[views.length - 1].getLastVisibleCfi();
@@ -902,5 +918,14 @@ var FixedView = function(options, reader) {
 
     };
 
+    this.getLoadedContentFrames = function() {
+        var views = getDisplayingViews();
+        var contentDocuments = [];
+        for (var i = 0, count = views.length; i < count; i++) {
+            var view = views[i];
+            contentDocuments.push(view.getLoadedContentFrames()[0]);
+        }
+        return contentDocuments.length ? contentDocuments : undefined;
+    };
 };
 export default FixedView;

@@ -344,6 +344,7 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
     };
 
     this.remove = function() {
+        onUnload(_currentSpineItem);
         this.clear();
 
         _currentSpineItem = undefined;
@@ -877,25 +878,17 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
         }
     }
 
-    this.onUnload = function() {
-        onUnload(_currentSpineItem);
-    };
-
     //expected callback signature: function(success, $iframe, spineItem, isNewlyLoaded, context)
     this.loadSpineItem = function(spineItem, callback, context) {
 
         if (_currentSpineItem != spineItem) {
 
-            var prevSpineItem = _currentSpineItem;
             _currentSpineItem = spineItem;
             var src = _spine.package.resolveRelativeUrl(spineItem.href);
 
             // both fixed layout and reflowable documents need hiding due to flashing during layout/rendering
             //hide iframe until content is scaled
             self.hideIFrame();
-
-            onUnload(prevSpineItem);
-
 
             Globals.logEvent("OnePageView.Events.SPINE_ITEM_OPEN_START", "EMIT", "one_page_view.js [ " + spineItem.href + " -- " + src + " ]");
             self.emit(OnePageView.Events.SPINE_ITEM_OPEN_START, _$iframe, _currentSpineItem);
@@ -1017,7 +1010,7 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
 
     this.getLoadedSpineItems = function() {
         return [_currentSpineItem];
-    }
+    };
 
     this.getNavigator = function() {
         return new CfiNavigationLogic({
@@ -1073,6 +1066,13 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
             return _$iframe.offset();
         }
         return undefined;
+    };
+
+    /**
+     * @private
+     */
+    this._fitImages = function (options) {
+        return Helpers.fitImages(_$epubHtml, options);
     };
 
     this.getVisibleElementsWithFilter = function(filterFunction) {

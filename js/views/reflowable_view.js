@@ -73,8 +73,14 @@ var ReflowableView = function(options, reader) {
     var _htmlBodyIsLTRDirection;
     var _htmlBodyIsLTRWritingMode;
 
+    var _isScrollingInternal = false;
+    var _supportsScrollOffsets = true;
+    var _skipNextResizeCallback = false;
+
 
     var _currentOpacity = -1;
+
+    var _narrowMargins = false;
 
     var _lastViewPortSize = {
         width: undefined,
@@ -99,6 +105,8 @@ var ReflowableView = function(options, reader) {
         pageOffset: 0,
         columnCount: 0
     };
+
+    this._navigationLogic = undefined;
 
     this.render = function() {
 
@@ -179,6 +187,10 @@ var ReflowableView = function(options, reader) {
         };
     }
 
+    function getScrollingElement() {
+        return _$iframe[0].contentDocument.scrollingElement || _$htmlBody[0];
+    }
+
     function getPageOffset() {
         if (_paginationInfo.rightToLeft && !_paginationInfo.isVerticalWritingMode) {
             return -_paginationInfo.pageOffset;
@@ -220,7 +232,7 @@ var ReflowableView = function(options, reader) {
         //_$iframe.css(_spine.isLeftToRight() ? "left" : "right", "0px");
         _$iframe.css("overflow", "hidden");
 
-        _navigationLogic = new CfiNavigationLogic({
+        self._navigationLogic = _navigationLogic = new CfiNavigationLogic({
             $iframe: _$iframe,
             frameDimensionsGetter: getFrameDimensions,
             paginationInfo: _paginationInfo,
@@ -229,6 +241,8 @@ var ReflowableView = function(options, reader) {
             elementBlacklist: _cfiElementBlacklist,
             idBlacklist: _cfiIdBlacklist
         });
+
+        _supportsScrollOffsets = Helpers.detectScrollOffsetTechniqueSupport(_$iframe[0].contentDocument);
     }
 
     function loadSpineItem(spineItem) {
@@ -392,11 +406,22 @@ var ReflowableView = function(options, reader) {
         // ////
 
         self.applyBookStyles();
+        if (isCoverImage(_$iframe[0].contentDocument.getElementsByTagName('body')[0])) {
         resizeImages();
+        }
 
         updateColumnGap();
 
         updateHtmlFontInfo();
+
+        _$iframe[0].contentWindow.addEventListener('scroll', function() {
+            if (_isScrollingInternal || !_supportsScrollOffsets) {
+                _isScrollingInternal = false;
+                return;
+            }
+            _paginationInfo.currentSpreadIndex = Math.round(getScrollingElement().scrollLeft / ((_paginationInfo.columnWidth + _paginationInfo.columnGap) * _paginationInfo.visibleColumnCount));
+            onPaginationChanged({initiator: self}, _currentSpineItem);
+        });
     }
 
     this.applyStyles = function() {
@@ -538,16 +563,26 @@ var ReflowableView = function(options, reader) {
 
     function redraw() {
 
-        var offsetVal = -_paginationInfo.pageOffset + "px";
+        var offsetVal =  -_paginationInfo.pageOffset + "px";
 
-        if (_htmlBodyIsVerticalWritingMode) {
+      if (_htmlBodyIsVerticalWritingMode) {
             _$epubHtml.css("top", offsetVal);
-        } else {
-            var ltr = _htmlBodyIsLTRDirection || _htmlBodyIsLTRWritingMode;
-
-            _$epubHtml.css("left", ltr ? offsetVal : "");
-            _$epubHtml.css("right", !ltr ? offsetVal : "");
         }
+        else
+        {
+        var ltr = _htmlBodyIsLTRDirection || _htmlBodyIsLTRWritingMode;
+        if (ltr && _supportsScrollOffsets) {
+          var scrollingElement = getScrollingElement();
+          offsetVal = _paginationInfo.pageOffset;
+          if (offsetVal !== scrollingElement.scrollLeft) {
+            _isScrollingInternal = true;
+            scrollingElement.scrollLeft = offsetVal;
+          }
+        } else {
+                _$epubHtml.css("left", ltr ? offsetVal : "");
+                _$epubHtml.css("right", !ltr ? offsetVal : "");
+        }
+      }
 
         showBook(); // as it's no longer hidden by shifting the position
     }
@@ -620,7 +655,7 @@ var ReflowableView = function(options, reader) {
     this.openPagePrev = function(initiator) {
 
         if (!_currentSpineItem) {
-            return;
+            return false;
         }
 
         if (_paginationInfo.currentSpreadIndex > 0) {
@@ -629,14 +664,16 @@ var ReflowableView = function(options, reader) {
             this.resetCurrentPosition();
             _paginationInfo.currentSpreadIndex--;
             onPaginationChanged(initiator, _currentSpineItem);
-        } else {
+            return true;
+        }
+        else {
 
             var prevSpineItem = _spine.prevItem(_currentSpineItem, true);
             if (prevSpineItem) {
 
                 var pageRequest = new PageOpenRequest(prevSpineItem, initiator);
                 pageRequest.setLastPage();
-                self.openPage(pageRequest);
+                return self.openPage(pageRequest);
             }
         }
     };
@@ -644,7 +681,7 @@ var ReflowableView = function(options, reader) {
     this.openPageNext = function(initiator) {
 
         if (!_currentSpineItem) {
-            return;
+            return false;
         }
 
         if (_paginationInfo.currentSpreadIndex < _paginationInfo.spreadCount - 1) {
@@ -653,20 +690,31 @@ var ReflowableView = function(options, reader) {
             this.resetCurrentPosition();
             _paginationInfo.currentSpreadIndex++;
             onPaginationChanged(initiator, _currentSpineItem);
-        } else {
+            return true;
+        }
+        else {
 
             var nextSpineItem = _spine.nextItem(_currentSpineItem, true);
             if (nextSpineItem) {
 
                 var pageRequest = new PageOpenRequest(nextSpineItem, initiator);
                 pageRequest.setFirstPage();
-                self.openPage(pageRequest);
+                return self.openPage(pageRequest);
             }
         }
     };
 
 
-    function updatePagination() {
+    function updatePagination(initiator) {
+        var epubContentDocument = _$iframe[0].contentDocument;
+
+        if (initiator !== Helpers.removeStyleSheet && _supportsScrollOffsets) {
+            Helpers.removeStyleSheet(epubContentDocument, 'scrolloffsets');
+            _.defer(function () {
+                updatePagination(Helpers.removeStyleSheet);
+            });
+            return;
+        }
 
         // At 100% font-size = 16px (on HTML, not body or descendant markup!)
         var MAXW = _paginationInfo.columnMaxWidth;
@@ -699,7 +747,9 @@ var ReflowableView = function(options, reader) {
             return;
         }
 
+        if (!initiator) {
         hideBook(); // shiftBookOfScreen();
+        }
 
         // "borderLeft" is the blank vertical strip (e.g. 40px wide) where the left-arrow button resides, i.e. previous page command
         var borderLeft = parseInt(_$viewport.css("border-left-width"));
@@ -723,10 +773,44 @@ var ReflowableView = function(options, reader) {
         adjustedGapRight = Math.max(0, adjustedGapRight - borderRight);
         // Typically, "adjustedGapRight" is zero because the space available for the 'next page' button is wider than half of the column gap! (in other words, the right-most and left-most page margins are fully included in the strips reserved for the arrow buttons)
 
-        _$el.css({
-            "left": (adjustedGapLeft + "px"),
-            "right": (adjustedGapRight + "px")
-        });
+        // Note that "availableWidth" does not contain "borderLeft" and "borderRight" (.width() excludes the padding and border and margin in the CSS box model of div#epub-reader-frame)
+        var availableWidth = _$viewport.width();
+
+        // ...So, we substract the page margins and button spacing to obtain the width available for actual text:
+        var textWidth = availableWidth - adjustedGapLeft - adjustedGapRight;
+
+        // ...and if we have 2 pages / columns, then we split the text width in half:
+        if (isDoublePageSyntheticSpread)
+        {
+            textWidth = (textWidth - _paginationInfo.columnGap) * 0.5;
+        }
+
+        var filler = 0;
+
+        // Now, if the resulting width actually available for document content is greater than the maximum allowed value, we create even more left+right blank space to "compress" the horizontal run of text.
+        if (textWidth > MAXW && !_narrowMargins)
+        {
+            var eachPageColumnReduction = textWidth - MAXW;
+
+            // if we have a 2-page synthetic spread, then we "trim" left and right sides by adding "eachPageColumnReduction" blank space.
+            // if we have a single page / column, then this loss of text real estate is shared between right and left sides
+            filler = Math.floor(eachPageColumnReduction * (isDoublePageSyntheticSpread ? 1 : 0.5));
+        }
+
+        // Let's check whether a narrow two-page synthetic spread (impeded reabability) can be reduced down to a single page / column:
+        else if (!forced && textWidth < MINW && isDoublePageSyntheticSpread)
+        {
+            isDoublePageSyntheticSpread = false;
+            _paginationInfo.visibleColumnCount = 1;
+
+            textWidth = availableWidth - adjustedGapLeft - adjustedGapRight;
+            if (textWidth > MAXW && !_narrowMargins)
+            {
+                filler = Math.floor((textWidth - MAXW) * 0.5);
+            }
+        }
+
+        _$el.css({"left": (filler+adjustedGapLeft + "px"), "right": (filler+adjustedGapRight + "px")});
 
         updateViewportSize(); //_$contentFrame ==> _lastViewPortSize
 
@@ -844,6 +928,17 @@ var ReflowableView = function(options, reader) {
 
         }
 
+      if (_supportsScrollOffsets) {
+        if (_supportsScrollOffsets && _paginationInfo.columnCount % 2) {
+          _.defer(function () {
+            console.debug("... odd columns (setting skip flag)");
+            var sheet = Helpers.createStyleSheet(epubContentDocument, 'scrolloffsets');
+            sheet.insertRule('body::after{content:\' \';display:block;width:100%;height:100vh;visibility:hidden;}', 0);
+            _skipNextResizeCallback = true;
+          });
+        }
+      }
+
         updateDocumentSize();
 
         if (_expandDocumentFullWidth) {
@@ -854,6 +949,10 @@ var ReflowableView = function(options, reader) {
         // to avoid the pagination process to trigger a resize event during its first
         // execution, provoking a flicker
         initResizeSensor();
+
+        if (isCoverImage(_$iframe[0].contentDocument.getElementsByTagName('body')[0])) {
+            resizeImages();
+        }
     }
 
     function initResizeSensor() {
@@ -867,12 +966,12 @@ var ReflowableView = function(options, reader) {
 
             console.debug("ReflowableView content resized ...", _lastDocumentSize.width, _lastDocumentSize.height, _currentSpineItem.idref);
 
-            if (documentSizeChanged) {
+            if (documentSizeChanged && !_skipNextResizeCallback) {
                 console.debug("... updating pagination.");
 
-                updatePagination();
+                updatePagination(ResizeSensor);
             } else {
-                console.debug("... ignored (identical dimensions).");
+                console.debug("... ignored (identical dimensions / skipped).");
             }
         });
     }
@@ -923,6 +1022,7 @@ var ReflowableView = function(options, reader) {
             paginationInfo.addOpenPage(pageIndexes[i], _paginationInfo.columnCount, _currentSpineItem.idref, _currentSpineItem.index);
         }
 
+        paginationInfo.reflowablePagination = _paginationInfo;
         return paginationInfo;
 
     };
@@ -944,34 +1044,20 @@ var ReflowableView = function(options, reader) {
 
     //we need this styles for css columnizer not to chop big images
     function resizeImages() {
-
-        if (!_$epubHtml) {
-            return;
+        return Helpers.fitImages(_$epubHtml);
         }
 
-        var $elem;
-        var height;
-        var width;
+    function isCoverImage(spineItem) {
+        var treewalker = document.createTreeWalker(spineItem, NodeFilter.SHOW_TEXT);
+        var node = treewalker.currentNode;
 
-        $('img, svg', _$epubHtml).each(function() {
-
-            $elem = $(this);
-
-            // if we set max-width/max-height to 100% columnizing engine chops images embedded in the text
-            // (but not if we set it to 99-98%) go figure.
-            // TODO: CSS min-w/h is content-box, not border-box (does not take into account padding + border)? => images may still overrun?
-            $elem.css('max-width', '98%');
-            $elem.css('max-height', '98%');
-
-            if (!$elem.css('height')) {
-                $elem.css('height', 'auto');
+        while(node){
+             if(_navigationLogic && _navigationLogic.isValidTextNode(node)) {
+                return false;
             }
-
-            if (!$elem.css('width')) {
-                $elem.css('width', 'auto');
+            node = treewalker.nextNode();
             }
-
-        });
+        return true;
     }
 
     this.bookmarkCurrentPage = function() {
@@ -1177,11 +1263,20 @@ var ReflowableView = function(options, reader) {
         return createBookmarkFromCfi(_navigationLogic.getNearestCfiFromElement(element));
     };
 
+    this.getLoadedContentFrames = function() {
+        return [{ spineItem: _currentSpineItem, $iframe: _$iframe }];
+    };
+
+    this.setNarrowMargins = function(isNarrow) {
+        _narrowMargins = isNarrow;
+        updatePagination();
+    };
+
     this.getPageIndexOffsetFromCfi = function(cfi) {
         return _navigationLogic.getPageIndexDeltaForCfi(cfi,
             _cfiClassBlacklist,
             _cfiElementBlacklist,
             _cfiIdBlacklist);
-    }
+    };
 };
 export default ReflowableView;
