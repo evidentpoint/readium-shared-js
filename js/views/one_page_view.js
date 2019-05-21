@@ -1140,7 +1140,7 @@ var OnePageView = function(options, classes, enableBookStyleOverrides, reader) {
     };
 
     this.getDomRangeFromRangeCfi = function(rangeCfi, rangeCfi2, inclusive) {
-        return self.getNavigator().getDomRangeFromRangeCfi(rangeCfi, rangeCfi2, inclusive);
+        return self.getNavigator().getDomRangeFromRangeCfi(rangeCfi.contentCFI, rangeCfi2 ? rangeCfi2.contentCFI : null, inclusive);
     };
 
     this.getRangeCfiFromDomRange = function(domRange) {
