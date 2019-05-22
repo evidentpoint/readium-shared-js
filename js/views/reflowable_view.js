@@ -1048,7 +1048,13 @@ var ReflowableView = function(options, reader) {
         }
 
     function isCoverImage(spineItem) {
-        var treewalker = document.createTreeWalker(spineItem, NodeFilter.SHOW_TEXT);
+        var treewalker = document.createTreeWalker(
+            spineItem,
+            NodeFilter.SHOW_TEXT,
+            function acceptNode() {
+                return NodeFilter.FILTER_ACCEPT;
+            },
+            false);
         var node = treewalker.currentNode;
 
         while(node){
