@@ -1,6 +1,6 @@
 {
   "name": "@evidentpoint/readium-shared-js",
-  "version": "1.1.0-alpha.2",
+  "version": "1.1.0-alpha.3",
   "engines": {
     "node": ">=4",
     "npm": ">=2",
