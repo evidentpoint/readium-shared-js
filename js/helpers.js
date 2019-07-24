@@ -1133,6 +1133,10 @@ Helpers.polyfillCaretRangeFromPoint = function(document) {
 };
 
 Helpers.detectScrollOffsetTechniqueSupport = function(document) {
+    if(Helpers.scrollOffsetTechniqueSupport){
+        return Helpers.scrollOffsetTechniqueSupport;
+    }
+
     var iframe = document.createElement('iframe');
     document.documentElement.appendChild(iframe);
     var iframeDoc = iframe.contentDocument;
@@ -1160,9 +1164,9 @@ Helpers.detectScrollOffsetTechniqueSupport = function(document) {
         "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.");
     var scrollingEl = iframeDoc.scrollingElement || iframeDoc.body;
     scrollingEl.scrollLeft = 50;
-    var test = scrollingEl.scrollLeft === 50;
+    Helpers.scrollOffsetTechniqueSupport = scrollingEl.scrollLeft === 50;
     $(iframe).remove();
-    return test;
+    return Helpers.scrollOffsetTechniqueSupport;
 };
 
 Helpers.createStyleSheet = function(document, id) {

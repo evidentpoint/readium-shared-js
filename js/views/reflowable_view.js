@@ -75,7 +75,6 @@ var ReflowableView = function(options, reader) {
 
     var _isScrollingInternal = false;
     var _supportsScrollOffsets = true;
-    var _skipNextResizeCallback = false;
 
 
     var _currentOpacity = -1;
@@ -706,16 +705,6 @@ var ReflowableView = function(options, reader) {
 
 
     function updatePagination(initiator) {
-        var epubContentDocument = _$iframe[0].contentDocument;
-
-        if (initiator !== Helpers.removeStyleSheet && _supportsScrollOffsets) {
-            Helpers.removeStyleSheet(epubContentDocument, 'scrolloffsets');
-            _.defer(function () {
-                updatePagination(Helpers.removeStyleSheet);
-            });
-            return;
-        }
-
         // At 100% font-size = 16px (on HTML, not body or descendant markup!)
         var MAXW = _paginationInfo.columnMaxWidth;
         var MINW = _paginationInfo.columnMinWidth;
@@ -928,17 +917,6 @@ var ReflowableView = function(options, reader) {
 
         }
 
-      if (_supportsScrollOffsets) {
-        if (_supportsScrollOffsets && _paginationInfo.columnCount % 2) {
-          _.defer(function () {
-            console.debug("... odd columns (setting skip flag)");
-            var sheet = Helpers.createStyleSheet(epubContentDocument, 'scrolloffsets');
-            sheet.insertRule('body::after{content:\' \';display:block;width:100%;height:100vh;visibility:hidden;}', 0);
-            _skipNextResizeCallback = true;
-          });
-        }
-      }
-
         updateDocumentSize();
 
         if (_expandDocumentFullWidth) {
@@ -966,7 +944,7 @@ var ReflowableView = function(options, reader) {
 
             console.debug("ReflowableView content resized ...", _lastDocumentSize.width, _lastDocumentSize.height, _currentSpineItem.idref);
 
-            if (documentSizeChanged && !_skipNextResizeCallback) {
+            if (documentSizeChanged) {
                 console.debug("... updating pagination.");
 
                 updatePagination(ResizeSensor);
