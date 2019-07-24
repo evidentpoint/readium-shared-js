@@ -22,6 +22,8 @@
 //  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 //  OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import _ from 'underscore';
+
 /**
  * @class Models.Style
  * @constructor
@@ -46,7 +48,8 @@ var Style = function(selector, declarations) {
      * @type 
      */
 
-    this.declarations = declarations;
+    //ensure original object is not overwritten
+    this.declarations = _.extend({}, declarations);
 
     /**
      * Set the declarations array
